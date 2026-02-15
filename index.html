@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Oslune · Home Automation</title>
+  <!-- Favicon (logo for browser tab) -->
+  <link rel="icon" type="image/png" href="logo.png">
+  <!-- Modern font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+  <!-- Minimal icon for cloud (Font Awesome) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <!-- Firebase v8 Legacy SDK (compatible with local/file serving) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 40% 30%, #131a26, #0b101a 80%, #040810);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      margin: 0;
+      color: rgba(255, 255, 255, 0.9);
+      position: relative;
+    }
+
+    /* subtle moving gradient – high‑end depth */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at 70% 90%, rgba(0, 200, 255, 0.04), transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .dashboard {
+      width: 100%;
+      max-width: 380px;
+      position: relative;
+      z-index: 3;
+    }
+
+    /* ----- main glass card (centered, premium) ----- */
+    .device-card {
+      background: rgba(18, 24, 34, 0.6);
+      backdrop-filter: blur(22px) saturate(180%);
+      -webkit-backdrop-filter: blur(22px) saturate(180%);
+      border-radius: 44px;
+      padding: 36px 28px 42px 28px;
+      box-shadow: 
+        0 30px 50px -20px rgba(0, 0, 0, 0.9),
+        0 0 0 1px rgba(130, 190, 255, 0.15) inset,
+        0 0 40px rgba(0, 180, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      transition: box-shadow 0.3s ease, border-color 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+    }
+
+    /* subtle gradient edge highlight */
+    .device-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 44px;
+      padding: 2px;
+      background: linear-gradient(145deg, rgba(255,255,255,0.2), rgba(100, 200, 255, 0.15) 40%, transparent 70%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    /* Header with logo and title */
+    .device-header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+
+    /* Circular logo container */
+    .logo-container {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%; /* This creates the circle */
+      overflow: hidden; /* This cuts the edges to make it circular */
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 0 15px rgba(70, 160, 255, 0.3);
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(4px);
+      flex-shrink: 0;
+    }
+
+    .logo-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover; /* This ensures the image covers the entire circle */
+      display: block;
+    }
+
+    /* simple, clear device name */
+    .device-name {
+      font-weight: 700;
+      font-size: 2.2rem;
+      letter-spacing: -0.02em;
+      background: linear-gradient(145deg, #ffffff, #c4ddff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: 0 2px 15px rgba(70, 160, 255, 0.3);
+      line-height: 1;
+    }
+
+    /* dynamic status text – clean and minimal */
+    .device-status {
+      font-size: 1.15rem;
+      font-weight: 500;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 8px 22px;
+      border-radius: 60px;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 32px;
+      color: rgba(255,255,255,0.85);
+      transition: background 0.3s ease, border-color 0.3s, box-shadow 0.2s;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+    }
+
+    /* iOS style toggle – large, smooth */
+    .toggle-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin: 16px 0 10px;
+    }
+
+    #deviceToggle {
+      display: none;
+    }
+
+    .toggle-switch {
+      display: inline-block;
+      width: 120px;
+      height: 62px;
+      background: rgba(40, 45, 58, 0.8);
+      border-radius: 44px;
+      position: relative;
+      cursor: pointer;
+      box-shadow: 
+        0 10px 22px rgba(0, 0, 0, 0.7),
+        0 0 0 2px rgba(255, 255, 255, 0.03) inset;
+      transition: background 0.25s ease-in-out, box-shadow 0.2s;
+      backdrop-filter: blur(2px);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      display: block;
+      width: 54px;
+      height: 54px;
+      background: white;
+      border-radius: 50%;
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6), 0 0 20px currentColor;
+      transition: transform 0.4s cubic-bezier(0.34, 1.3, 0.64, 1), background 0.3s, box-shadow 0.3s;
+    }
+
+    /* ON – green glow */
+    #deviceToggle:checked + .toggle-switch {
+      background: rgba(26, 110, 40, 0.95);
+      box-shadow: 0 0 24px #1fe070, 0 0 45px #1fe07060, 0 0 2px #d0ffdd inset;
+    }
+
+    #deviceToggle:checked + .toggle-switch::after {
+      transform: translateX(58px);
+      background: #f2fff2;
+      box-shadow: 0 4px 18px #b5ffc0, 0 0 36px #4effa0;
+    }
+
+    /* OFF – red glow */
+    #deviceToggle:not(:checked) + .toggle-switch {
+      background: rgba(150, 38, 38, 0.95);
+      box-shadow: 0 0 20px #ff5f5f, 0 0 40px #ff5f5f50, 0 0 2px #ffc1c1 inset;
+    }
+
+    #deviceToggle:not(:checked) + .toggle-switch::after {
+      background: #fffafa;
+      box-shadow: 0 4px 14px #ff8787, 0 0 28px #ff3b3b;
+    }
+
+    /* cloud badge – subtle iot reference */
+    .cloud-badge {
+      margin-top: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      font-weight: 400;
+      color: rgba(190, 215, 255, 0.8);
+      background: rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(6px);
+      padding: 6px 18px;
+      border-radius: 60px;
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .cloud-badge i {
+      font-size: 0.9rem;
+      color: #74c0ff;
+      filter: drop-shadow(0 0 6px #3f9eff);
+    }
+
+    /* status dynamic text */
+    .status-dynamic {
+      transition: color 0.1s;
+      font-weight: 500;
+    }
+
+    /* micro-interaction */
+    .device-card:active {
+      transform: scale(0.99);
+      transition: transform 0.15s;
+    }
+
+    /* smaller screens fine‑tune */
+    @media (max-width: 380px) {
+      .toggle-switch {
+        width: 110px;
+        height: 58px;
+      }
+      .toggle-switch::after {
+        width: 50px;
+        height: 50px;
+      }
+      #deviceToggle:checked + .toggle-switch::after {
+        transform: translateX(52px);
+      }
+      
+      .logo-container {
+        width: 40px;
+        height: 40px;
+      }
+      
+      .device-name {
+        font-size: 1.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <div class="device-card">
+      <!-- Header with logo and device name -->
+      <div class="device-header">
+        <div class="logo-container">
+          <img src="logo.png" alt="Home Automation Logo" onerror="this.style.display='none'">
+        </div>
+        <div class="device-name">ANIQUE</div>
+      </div>
+
+      <!-- dynamic status text (updated by Firebase + toggle) -->
+      <div class="device-status" id="statusContainer">
+        <span class="status-dynamic" id="dynamicStatus">‑‑</span>
+      </div>
+
+      <!-- large iOS‑inspired toggle (connected to Firebase) -->
+      <div class="toggle-wrapper">
+        <input type="checkbox" id="deviceToggle">
+        <label for="deviceToggle" class="toggle-switch" id="toggleLabel" aria-label="toggle device"></label>
+      </div>
+
+      <!-- cloud indicator (always visible, minimal) -->
+      <div class="cloud-badge">
+        <i class="fas fa-cloud"></i> <span>cloud · realtime</span>
+        <i class="fas fa-circle" style="font-size: 0.45rem; color: #6ef0a0; filter: drop-shadow(0 0 5px #17d46a);"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- 
+    FIREBASE INTEGRATION (v8 legacy) – fully working with database.
+    Path: /bulb/state (boolean). Replace with your ESP32 path.
+  -->
+  <script>
+    (function() {
+      // Firebase configuration (exactly as provided, using v8 style)
+      const firebaseConfig = {
+        apiKey: "AIzaSyDEXnA-S9kojwwtnRRanT8d8Z9HpOLSRgA",
+        authDomain: "test-homeautomation-437f5.firebaseapp.com",
+        databaseURL: "https://test-homeautomation-437f5-default-rtdb.firebaseio.com",
+        projectId: "test-homeautomation-437f5",
+        storageBucket: "test-homeautomation-437f5.firebasestorage.app",
+        messagingSenderId: "26030754960",
+        appId: "1:26030754960:web:328a1280c853c21749dc15",
+        measurementId: "G-7MCXGMZCT4"
+      };
+
+      // Initialize Firebase (v8)
+      firebase.initializeApp(firebaseConfig);
+      const database = firebase.database();
+
+      // DOM elements
+      const toggle = document.getElementById('deviceToggle');
+      const dynamicStatus = document.getElementById('dynamicStatus');
+      const statusContainer = document.getElementById('statusContainer');
+
+      // Reference to device state (adjust path to match your DB, e.g., 'bulb/state')
+      const stateRef = database.ref('bulb/state');
+
+      // --- Listen for changes from Firebase (ESP32 or other clients) ---
+      stateRef.on('value', (snapshot) => {
+        const val = snapshot.val();
+        // Only update if it's a boolean (safety)
+        if (typeof val === 'boolean') {
+          toggle.checked = val;
+          updateStatusUI(val);
+        } else {
+          // fallback if null / undefined: default false
+          toggle.checked = false;
+          updateStatusUI(false);
+        }
+      }, (error) => {
+        console.warn('Firebase read failed, using local fallback', error);
+        // keep last known or default false
+        updateStatusUI(toggle.checked);
+      });
+
+      // --- Update UI (status text + card glow) ---
+      function updateStatusUI(isOn) {
+        if (isOn) {
+          dynamicStatus.innerText = 'on';
+          statusContainer.style.background = 'rgba(26, 60, 36, 0.4)';
+          statusContainer.style.borderColor = 'rgba(70, 230, 120, 0.4)';
+          statusContainer.style.boxShadow = '0 0 12px rgba(70, 255, 120, 0.3)';
+        } else {
+          dynamicStatus.innerText = 'off';
+          statusContainer.style.background = 'rgba(50, 28, 28, 0.35)';
+          statusContainer.style.borderColor = 'rgba(255, 110, 110, 0.3)';
+          statusContainer.style.boxShadow = '0 0 12px rgba(255, 80, 80, 0.2)';
+        }
+      }
+
+      // initial call (with current toggle state before firebase answer)
+      updateStatusUI(toggle.checked);
+
+      // --- When user toggles switch, write to Firebase ---
+      toggle.addEventListener('change', function(e) {
+        const newState = toggle.checked;
+        // Optimistic UI update (already looks changed)
+        updateStatusUI(newState);
+
+        // Send to Firebase (realtime DB)
+        stateRef.set(newState)
+          .then(() => {
+            console.log('State synced to cloud:', newState);
+          })
+          .catch((err) => {
+            console.warn('Firebase write failed, revert UI', err);
+            // revert toggle to previous known value? better read from db but we revert manually
+            // we could read from db again, but for simplicity revert to old (but we don't have old)
+            // To keep consistent, we revert to the last known FB value by reading once
+            stateRef.once('value').then((snap) => {
+              const fbVal = snap.val();
+              if (typeof fbVal === 'boolean') {
+                toggle.checked = fbVal;
+                updateStatusUI(fbVal);
+              }
+            });
+          });
+      });
+
+      // adjust card glow based on toggle (extra realism)
+      const card = document.querySelector('.device-card');
+      function updateCardGlow() {
+        if (toggle.checked) {
+          card.style.boxShadow = '0 30px 50px -20px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(70, 240, 150, 0.3) inset, 0 0 40px #2ce09a';
+        } else {
+          card.style.boxShadow = '0 30px 50px -20px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 120, 120, 0.2) inset, 0 0 30px #ff7060';
+        }
+      }
+      toggle.addEventListener('change', updateCardGlow);
+      // initial card glow based on default unchecked
+      updateCardGlow();
+
+      // (Optional) also update card glow when fb changes
+      stateRef.on('value', (snap) => {
+        if (typeof snap.val() === 'boolean') {
+          updateCardGlow();
+        }
+      });
+
+    })();
+  </script>
+
+  <!-- ensure status text never shows iVault or long phrases — only "on" / "off" -->
+  <style>
+    /* just to guarantee simplicity */
+    .status-dynamic {
+      text-transform: lowercase;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    .device-name {
+      user-select: none;
+    }
+  </style>
+</body>
+</html>
